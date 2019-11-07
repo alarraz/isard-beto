@@ -53,6 +53,8 @@ services:
   isard-app:
     container_name: isard-app
     volumes:
+      - "./src:/isard"
+    volumes:
       - "sshkeys:/root/.ssh"
       - "/opt/isard/certs:/certs"
       - "/opt/isard/logs:/isard/logs"

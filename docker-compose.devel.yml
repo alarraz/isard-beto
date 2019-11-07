@@ -19,6 +19,7 @@ services:
   pgAdmin:
     restart: "no"
     image: dpage/pgadmin4
+    container_name: "isard-pgadmin"
     ports:
       - "8000:80"
     environment:
@@ -52,6 +53,7 @@ services:
     restart: "no"
 
   isard-app:
+    image: isard/app:${TAG_DEVEL}
     container_name: isard-app-devel
     volumes:
       - "./src:/isard"

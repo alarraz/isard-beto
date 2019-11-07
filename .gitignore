@@ -58,3 +58,6 @@ csv/
 install/.wizard
 
 known_hosts
+
+#devel prefix files ignore in root
+/devel*
