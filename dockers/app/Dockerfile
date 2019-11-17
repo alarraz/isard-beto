@@ -5,15 +5,16 @@ MAINTAINER isard <info@isard.com>
 
 # Needed in hypervisor connection scripts
 RUN apk add --no-cache bash curl openssh-client
-RUN apk add --no-cache py3-psycopg2
+#RUN apk add --no-cache py3-psycopg2
+
 
 # Removed in new version. Kept here only to reference
 #py3-libvirt py3-paramiko py3-lxml py3-pexpect py3-openssl py3-bcrypt py3-gevent py3-netaddr py3-requests curl openssh-client py3-psycopg2
 
 COPY dockers/app/requirements.pip3 /requirements.pip3
-RUN apk add --no-cache --virtual .build_deps build-base python3-dev libffi-dev openssl-dev
+RUN apk add --no-cache --virtual .build_deps build-base python3-dev libffi-dev openssl-dev postgresql-dev libxslt-dev libxml2-dev
+
 RUN pip3 install --no-cache-dir -r requirements.pip3
-RUN pip3 install --no-cache-dir grpcio-tools asyncssh
 RUN apk del .build_deps
 
 RUN mkdir -p /root/.ssh
@@ -45,6 +46,7 @@ RUN apk add --no-cache git vim nano openssh
 RUN apk add --no-cache build-base python3-dev
 RUN pip3 install ipython pytest
 RUN pip install -U $(pip freeze | awk '{split($0, a, "=="); print a[1]}')
+
 
 
 #COPY dockers/app/certs_devel.sh /certs.sh

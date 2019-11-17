@@ -1,4 +1,4 @@
-from common.sm.domain_sm import DesktopSM
+from common.sm.domain_sm import DomainSM
 # ~ import engine.exceptions
 from common.exceptions.engine import *
 
@@ -17,7 +17,7 @@ import sys, os
 
 class EngineMock(object):
     def __init__(self):
-        self.desktop_sm = DesktopSM()
+        self.desktop_sm = DomainSM()
         
         # ~ self.db = create_engine('postgresql://isardvdi:isardvdi@isard-database:5432/engine')
         # ~ self.dbsession = sessionmaker(bind=self.db)

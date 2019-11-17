@@ -32,12 +32,14 @@ class Hyp(object):
         self.port = port
         self.hostname = hostname
         self.username = username
+        self.alive_ssh = False
+        self.alive_libvirt
 
 
     def verify_parameters_ssh(self,port,hostname,username):
         if type(port) is not int:
             raise UnAcceptedValueConnectionHypParameters("Port for ssh connection must be integer")
-        if type(address) is not str:
+        if type(hostname) is not str:
             raise UnAcceptedValueConnectionHypParameters("Hostname for ssh connection must be string")
         if type(username) is not str:
             raise UnAcceptedValueConnectionHypParameters("Username for ssh connection must be string")
@@ -60,4 +62,43 @@ class Hyp(object):
         if all(x.find(' ')<0 for x in username.split('.')):
             raise UnAcceptedValueConnectionHypParameters(f"Username as space characters: {username}")
 
+    async def open_ssh_process(self):
+        print('antes de conexion')
+        self.conn = await create_conn()
+        self.process = await self.conn.create_process()
+        print('conexión ok')
+        self.conn_ok.set()
+        self.send_cmd_event.set()
+
+    async def cmd_event_launch(self):
+        while not self.shutdown_event.is_set():
+            if self.ok == True:
+                print('voy a poner a ok el evento send_cmd')
+                self.send_cmd_event.set()
+                self.ok = False
+            #print('antes del sleep')
+            await asyncio.sleep(0.1)
+            #print('despues del sleep')
+
+    async def send_command(self):
+        await self.conn_ok.wait()
+        print('salgo del await evento de conexión')
+
+        while not self.shutdown_event.is_set():
+            print('dentro del bucle que espera a send_cmd_event')
+            await self.send_cmd_event.wait()
+            print(f'se ha activado el evento cmd_event ')
+            print(f'el comando es: {self.command}')
+            self.process.stdin.write(self.command)
+            self.process.stdin.write('\n')
+            #self.process.stdin.write_eof()
+            print('comando enviado')
+            #stdout_data, stderr_data = await self.process.communicate()
+            stdout_data = await self.process.stdout.readline()
+            #stderr_data = await self.process.stderr.read()
+            print('datos recogidos:')
+            pprint(stdout_data)
+            #pprint(stderr_data)
+            await asyncio.sleep(0.1)
+            self.send_cmd_event.clear()
 

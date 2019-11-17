@@ -17,11 +17,12 @@ from core.lib import get_tid
 from common.exceptions.engine import *
 
 TIMEOUT_TO_STOP = 0.5
+MAXSIZE_QUEUE_ACTIONS = 1000
 
 class ActionsThread(threading.Thread):
     """Thread that waits actions in asyncio queue and dispatch to other tasks.
 
-    The wait_action_task
+
 
     Attributes:
         tid (int): Thread ID, useful if you want to identify with htop.
@@ -30,7 +31,7 @@ class ActionsThread(threading.Thread):
         stop: asyncio Event to stop queue
 
     """
-    def __init__(self, name, max_random_sleep=5, queue_master=None):
+    def __init__(self, name):
         threading.Thread.__init__(self)
 
         self.name = name
@@ -53,8 +54,8 @@ class ActionsThread(threading.Thread):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
-        # Creaating queue
-        self.q = asyncio.PriorityQueue()
+        # Creating queue
+        self.q = asyncio.PriorityQueue(maxsize=MAXSIZE_QUEUE_ACTIONS)
 
         #TASKS
         wait_actions_task = self.loop.create_task(self.wait_actions())
@@ -67,12 +68,6 @@ class ActionsThread(threading.Thread):
         self.loop.run_until_complete(self.gathered_tasks)
         # asyncio.run(self.main())
 
-    # async def main(self):
-    #
-    #     await asyncio.gather(self.wait_actions(),
-    #                          # self.send_command(),
-    #                          # self.cmd_event_launch(),
-    #                          )
 
     async def random_actions(self):
         counter = itertools.count()
