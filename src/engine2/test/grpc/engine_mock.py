@@ -2,24 +2,69 @@ from common.sm.domain_sm import DesktopSM
 # ~ import engine.exceptions
 from common.exceptions.engine import *
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from models.desktop import *
-from api.grpc.proto import desktop_pb2
+# ~ from sqlalchemy import create_engine
+# ~ from sqlalchemy.orm import sessionmaker
+from models.domain import *
+
+
+# ~ from common.connection_manager import db_session
+from common.connection_manager import engine
+from sqlalchemy.orm import scoped_session, sessionmaker
+db = scoped_session(sessionmaker(bind=engine))
+
+from api.grpc.proto import domain_pb2
 import sys, os
 
 class EngineMock(object):
     def __init__(self):
         self.desktop_sm = DesktopSM()
         
-        self.db = create_engine('postgresql://isardvdi:isardvdi@isard-database:5432/engine')
-        self.dbsession = sessionmaker(bind=self.db)
-        self.session = self.dbsession()
-        self.desktop = DesktopMock(self.session)
+        # ~ self.db = create_engine('postgresql://isardvdi:isardvdi@isard-database:5432/engine')
+        # ~ self.dbsession = sessionmaker(bind=self.db)
+        # ~ self.session = db_session()
+        self.domain = DomainMock() #(self.session)
 
-class DesktopMock(object):
-    def __init__(self, session):
-        self.session = session    
+class DomainMock(object):
+    def __init__(self):
+        # ~ self.session = session  
+        pass  
+
+    def list(self,pb=False):
+        ''' From running dict '''
+        try:
+            # ~ with db_session() as db:
+            domains = db.query(Domain).all()
+                # ~ domains = self.session.query(Domain).all()
+            if pb:
+                return [domain_pb2.DomainMessage(**d.to_dict()) for d in domains]
+            domains_dict = {}
+            for domain in [d.to_dict() for d in domains]:
+                id = domain.pop('id')
+                domains_dict[id] = domain
+            return domains_dict
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            raise Exception(f'boot_list error: \nType: {exc_type}\n File: {fname}\n Line: {exc_tb.tb_lineno}\n Error: {e}')
+
+    def get(self,pb=False):
+        ''' From running dict '''
+        try:
+            # ~ with db_session() as db:
+            domain = db.query(Domain('_admin_tetros')).get()
+                # ~ domains = self.session.query(Domain).all()
+            if pb:
+                return domain_pb2.DomainMessage(**domain.to_dict())
+            return domain
+            domains_dict = {}
+            for domain in [d.to_dict() for d in domains]:
+                id = domain.pop('id')
+                domains_dict[id] = domain
+            return domains_dict
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            raise Exception(f'boot_list error: \nType: {exc_type}\n File: {fname}\n Line: {exc_tb.tb_lineno}\n Error: {e}')
             
     def video_list(self,pb=False):
         ''' From running dict '''
@@ -116,6 +161,69 @@ class DesktopMock(object):
             exc_type, exc_obj, exc_tb = sys.exc_info()
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             raise Exception(f'boot_list error: \nType: {exc_type}\n File: {fname}\n Line: {exc_tb.tb_lineno}\n Error: {e}')
+
+    def new(self, desktop_id, hardware, pb=False):
+        ''' '''
+        try:
+            desktop = Desktop(id=d.id, vcpu = d.hardware.vcpus, memory = d.hardware.memory)
+            ### Create new instances: disks
+            i=1
+            for d in hardware['disks']:
+                disk = Disk(d.id, d.rpath, 
+                        session.query(DiskBus).get(d.bus), 
+                        'vda', d.size, 
+                        session.query(DiskFormat).get(d.format))
+                session.add(Desktop_Disk_Association(desktop=desktop, disk_id=d.id, order = i))
+                i=i+1
+            i=1
+            for b in hardware['boots']:
+                session.add(Desktop_Boot_Association(desktop=desktop, boot_id=b, order = i))
+                i=i+1
+                
+            boots = [Boot(b) for b in hardware['boots']]
+            result = self.session.query(Interface).all()
+            if pb:
+                return [desktop_pb2.Interface(**i.to_dict()) for i in interfaces]
+            interfaces_dict = {}
+            for interface in [i.to_dict() for i in interfaces]:
+                id = interface.pop('id')
+                interfaces_dict[id] = interface
+            return interfaces_dict
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            raise Exception(f'boot_list error: \nType: {exc_type}\n File: {fname}\n Line: {exc_tb.tb_lineno}\n Error: {e}')                                                                                              
+    def DesktopGet(self,desktop_id):
+        ''' From running dict '''
+        desktop = self.db.select('desktops',desktop_id)
+        if desktop is not None: return desktop
+        raise NotFoundError(desktop_id, 'Desktop not found in system')
+    
+    def DesktopGetState(desktop_ids):
+        return self.mem.desktops[destop_id]['state']
+
+
+
+    # ~ ###### Create Desktop
+    # ~ ### Create new elements: disk
+    # ~ disk1_bus= session.query(DiskBus).get('virtio')
+    # ~ disk1_format = session.query(DiskFormat).get('qcow2')
+    # ~ disk1 = Disk('_admin_tetros_disk', '/pepinillo', disk1_bus, 'vda', 4, disk1_format)
+    # ~ session.add(disk1)
+    #session.add(Disk('_admin_tetros_disk', '/pepinillo', disk1_bus, 'vda', 4, disk1_format))
+
+    # ~ desktop = Desktop(id="_admin_tetros", vcpu = 1, memory = 768)
+    # ~ session.add(desktop)
+    
+    # ~ session.add(Desktop_Disk_Association(desktop=desktop, disk_id='_admin_tetros_disk', order = 1))
+    # ~ session.add(Desktop_Boot_Association(desktop=desktop, boot_id='pxe', order = 1))
+    # ~ session.add(Desktop_Graphic_Association(desktop=desktop, graphic_id='spice', order = 1))
+    # ~ session.add(Desktop_Interface_Association(desktop=desktop, interface_id='default', order = 1))
+    # ~ desktop.video_id='qxl'
+    
+    # ~ session.add(desktop)    
+    # ~ session.commit()    
+
 
     # ~ def from_template(self, desktop_id, template_id, hardware, pb=False):
         # ~ ''' '''
