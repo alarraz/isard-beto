@@ -1,4 +1,4 @@
-from common.sm.desktop_sm import DesktopSM
+from common.sm.domain_sm import DesktopSM
 # ~ import engine.exceptions
 from common.exceptions.engine import *
 
