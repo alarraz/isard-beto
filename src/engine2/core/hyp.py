@@ -3,9 +3,19 @@
 #      Josep Maria Viñolas Auquer
 # License: AGPLv3
 
+import sys
+import logging
 import libvirt
 
-from engine2.common.exceptions import UnAcceptedValueConnectionHypParameters
+from models.domain import Domain
+from common.exceptions.engine import UnAcceptedValueConnectionHypParameters
+
+def hostname_to_uri(hostname, user='root', port=22):
+    if (hostname == '127.0.0.1') or (hostname == 'localhost'):
+        uri = 'qemu:///system'
+    else:
+        uri = 'qemu+ssh://{}@{}:{}/system'.format(user, hostname, port)
+    return uri
 
 
 
@@ -33,8 +43,96 @@ class Hyp(object):
         self.hostname = hostname
         self.username = username
         self.alive_ssh = False
-        self.alive_libvirt
+        self.alive_libvirt = False
+        self.conn = False
 
+    def open_libvirt_connection(self):
+        """ create libvirt hypervisor connecton"""
+        self.uri = hostname_to_uri(self.hostname, user=self.username, port=self.port)
+
+        try:
+            self.conn = libvirt.open(self.uri)
+        except libvirt.libvirtError as e:
+            self.conn = False
+            logging.error()
+            raise e
+
+    def get_xml(self,domain_id):
+        try:
+            xml = Domain.get_xml(domain_id)
+            return xml
+        except Exception as e:
+            raise e
+
+    def start_domain(self,domain_id):
+        xml = self.get_xml()
+        self.start_domain()
+
+    def libvirt_conn_is_alive(self):
+        if self.conn is not False:
+            try:
+                if self.conn.isAlive():
+                    self.alive_libvirt = True
+                else:
+                    self.alive_libvirt = False
+            except:
+                self.alive_libvirt = False
+
+    def start_from_xml(self,xml):
+        try:
+            d = self.conn.createXML(xml)
+        except libvirt.libvirtError as e:
+            #if create fail, we can test if xml sintax is ok
+            try:
+                d = self.conn.defineXML(xml)
+                d.undefine()
+            except libvirt.libvirtError as e:
+                raise e
+            raise e
+        except Exception as e:
+            raise e
+        else:
+            return d
+
+    def start_from_xml(self,xml):
+        try:
+            d = self.conn.createXML(xml, flags=libvirt.VIR_DOMAIN_START_PAUSED)
+            xml_started = d.XMLDesc()
+            xml_stopped = d.XMLDesc(libvirt.VIR_DOMAIN_XML_INACTIVE)
+            d.destroy()
+        except libvirt.libvirtError as e:
+            #if create fail, we can test if xml sintax is ok
+            try:
+                d = self.conn.defineXML(xml)
+                d.undefine()
+            except libvirt.libvirtError as e:
+                raise e
+            raise e
+        except Exception as e:
+            raise e
+        else:
+            return True, xml_started, xml_stopped
+
+    def get_domains(self):
+        """
+        return dictionary with domain objects of libvirt
+        keys of dictionary are names
+        domains can be started or paused
+        """
+        if self.connected:
+            self.domains = {}
+            try:
+                for d in self.conn.listAllDomains(libvirt.VIR_CONNECT_LIST_DOMAINS_ACTIVE):
+                    try:
+                        domain_name = d.name()
+                    except:
+                        log.info('unkown domain fail when trying to get his name, power off??')
+                        continue
+                    if domain_name[0] == '_':
+                        self.domains[domain_name] = d
+            except:
+                log.error('error when try to list domain in hypervisor {}'.format(self.hostname))
+                self.domains = {}
 
     def verify_parameters_ssh(self,port,hostname,username):
         if type(port) is not int:
@@ -56,10 +154,11 @@ class Hyp(object):
             hostname = hostname[:-1]  # strip exactly one dot from the right, if present
         #allowed = re.compile("(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
         #if all(allowed.match(x) for x in hostname.split(".")) is False:
-        if all(x.find(' ')<0 for x in hostname.split('.')):
-            raise UnAcceptedValueConnectionHypParameters(f"Hostname as space characters: {hostname}")
+        if hostname.find('.') >= 0:
+            if all(x.find(' ')<0 for x in hostname.split('.')):
+                raise UnAcceptedValueConnectionHypParameters(f"Hostname as space characters: {hostname}")
 
-        if all(x.find(' ')<0 for x in username.split('.')):
+        if username.find(' ')>=0:
             raise UnAcceptedValueConnectionHypParameters(f"Username as space characters: {username}")
 
     async def open_ssh_process(self):

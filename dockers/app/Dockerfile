@@ -5,17 +5,21 @@ MAINTAINER isard <info@isard.com>
 
 # Needed in hypervisor connection scripts
 RUN apk add --no-cache bash curl openssh-client
-#RUN apk add --no-cache py3-psycopg2
+
 
 
 # Removed in new version. Kept here only to reference
 #py3-libvirt py3-paramiko py3-lxml py3-pexpect py3-openssl py3-bcrypt py3-gevent py3-netaddr py3-requests curl openssh-client py3-psycopg2
 
 COPY dockers/app/requirements.pip3 /requirements.pip3
-RUN apk add --no-cache --virtual .build_deps build-base python3-dev libffi-dev openssl-dev postgresql-dev libxslt-dev libxml2-dev
+
+RUN apk add --no-cache --virtual .build_deps build-base python3-dev libffi-dev openssl-dev postgresql-dev libxslt-dev libxml2-dev libvirt-dev
 
 RUN pip3 install --no-cache-dir -r requirements.pip3
 RUN apk del .build_deps
+
+#Need for run psycopg2 and lxml
+RUN apk add --no-cache libpq libxslt-dev libxml2-dev
 
 RUN mkdir -p /root/.ssh
 RUN echo "Host isard-hypervisor \
