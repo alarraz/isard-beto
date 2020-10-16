@@ -763,7 +763,15 @@ class UiActions(object):
             kind = get_domain_kind(id_domain)
             if kind == 'desktop':
                 cpu_host_model = self.manager.pools[pool_id].conf.get('cpu_host_model', DEFAULT_HOST_MODE)
-                xml_to_test = recreate_xml_to_start(id_domain,ssl,cpu_host_model)
+                try:
+                    xml_to_test = recreate_xml_to_start(id_domain,ssl,cpu_host_model)
+                except Exception as e:
+                    log.error(f'Exception when updating xml in domain: {id_domain}')
+                    log.error(f'Exception message: {e}')
+                    log.error('Traceback: \n .{}'.format(traceback.format_exc()))
+                    update_domain_status('Failed', id_domain,
+                                         detail=f'Updating failed: {e}')
+                    return False
                 self.start_paused_domain_from_xml(xml=xml_to_test, id_domain=id_domain, pool_id=pool_id)
             else:
                 update_domain_status('Stopped', id_domain,
