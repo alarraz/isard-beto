@@ -349,6 +349,60 @@ class hyp(object):
 
         return xml_stopped, xml_started
 
+    def create_networks(self,list_net_names,xml_net_snippet=''):
+        nets_created = []
+        try:
+            nets_running = self.conn.listNetworks()
+        except Exception as e:
+            log.error(f'hypervisor connection in {self.hostname}can not get networks running')
+            log.error(f'Exception detail: {e}')
+            return nets_created
+
+        if len(xml_net_snippet) == 0:
+            xml_net_snippet = """<network>
+                                    <name>{net_name}</name>
+                                </network>
+                            """
+
+        for netname in list_net_names:
+            if netname in nets_running:
+                log.error(f'net with name {netname} can not be created because is running now in hypervisor {self.hostname}')
+            else:
+                try:
+                    xml = xml_net_snippet.format(net_name=netname)
+                    net = self.conn.networkCreateXML(xml)
+                    nets_created.append(net)
+                except Exception as e:
+                    log.error(f'Exception creating network {netname} in hypervisor {self.hostname} with xml: \n{xml}')
+                    log.error(f'Exception detail: {e}')
+
+        return nets_created
+
+    def destroy_networks(self,list_net_names):
+        nets_deleted = []
+        try:
+            d_nets_running = {n.name():n for n in self.conn.listAllNetworks()}
+        except Exception as e:
+            log.error(f'hypervisor connection in {self.hostname}can not get networks running')
+            log.error(f'Exception detail: {e}')
+            return nets_deleted
+
+        for netname in list_net_names:
+            if netname in d_nets_running.keys():
+                try:
+                    d_nets_running[netname].destroy()
+                    nets_deleted.append(netname)
+                except Exception as e:
+                    log.error(f'Exception deleting network {netname} in hypervisor {self.hostname}')
+                    log.error(f'Exception detail: {e}')
+            else:
+                log.error(f'Network {netname} can not be deleted, it is not defined in hypervisor {self.hostname}')
+
+        return nets_deleted
+
+
+
+
     def get_domains(self):
         """
         return dictionary with domain objects of libvirt

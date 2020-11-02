@@ -538,6 +538,23 @@ def get_domain_hardware_dict(id_domain):
     close_rethink_connection(r_conn)
     return result['hardware']
 
+def get_domain_create_dict(id_domain):
+    r_conn = new_rethink_connection()
+    rtable = r.table('domains')
+
+    result = rtable.get(id_domain).pluck('create_dict').run(r_conn)
+    close_rethink_connection(r_conn)
+    return result['create_dict']
+
+def get_domains_from_user_started_with_personal_network(user):
+    r_conn = new_rethink_connection()
+    rtable = r.table('domains')
+    l = list(rtable.filter({'status':'Started','user': user, 'kind': 'desktop'}).pluck('status', 'id', 'kind','hyp_started',
+                                                           {'hardware': [{'interfaces': ['type','net']}]}).run(r_conn))
+    close_rethink_connection()
+    return l
+
+
 def get_domain_status(id):
     r_conn = new_rethink_connection()
     rtable = r.table('domains')

@@ -509,7 +509,7 @@ class DomainXML(object):
             interface_etree = etree.parse(StringIO(XML_SNIPPET_BRIDGE))
             interface_etree.xpath('/interface')[0].xpath('source')[0].set('bridge', net)
 
-        elif type_interface == 'network':
+        elif type_interface == 'network' or type_interface == 'user':
             interface_etree = etree.parse(StringIO(XML_SNIPPET_NETWORK))
             interface_etree.xpath('/interface')[0].xpath('source')[0].set('network', net)
 

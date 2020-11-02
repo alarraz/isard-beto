@@ -57,6 +57,9 @@ class HypWorkerThread(threading.Thread):
 
                 if action['type'] == 'start_paused_domain':
                     logs.workers.debug('xml to start paused some lines...: {}'.format(action['xml'][30:100]))
+                    nets_to_be_defined = action.get('create_nets',[])
+                    if len(nets_to_be_defined) > 0:
+                        self.h.create_networks(nets_to_be_defined)
                     try:
                         self.h.conn.createXML(action['xml'], flags=VIR_DOMAIN_START_PAUSED)
                         # 32 is the constant for domains paused
@@ -78,6 +81,7 @@ class HypWorkerThread(threading.Thread):
                                 except Exception as e:
                                     logs.workers.debug('verified domain {} is destroyed'.format(action['id_domain']))
                                 domain_active = False
+                                self.h.destroy_networks(nets_to_be_defined)
 
                             except libvirtError as e:
                                 from pprint import pformat
@@ -133,6 +137,10 @@ class HypWorkerThread(threading.Thread):
                 ## START DOMAIN
                 elif action['type'] == 'start_domain':
                     logs.workers.debug('xml to start some lines...: {}'.format(action['xml'][30:100]))
+                    nets_to_be_defined = action.get('create_nets',[])
+                    if len(nets_to_be_defined) > 0:
+                        self.h.create_networks(nets_to_be_defined)
+
                     try:
                         dom = self.h.conn.createXML(action['xml'])
                         xml_started = dom.XMLDesc()

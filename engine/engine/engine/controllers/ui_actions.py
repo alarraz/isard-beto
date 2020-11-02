@@ -21,7 +21,8 @@ from engine.services.db import update_domain_viewer_started_values, update_table
     create_disk_template_created_list_in_domain, get_pool_from_domain, get_domain, insert_domain, delete_domain, \
     update_domain_status, get_domain_force_hyp, get_hypers_in_pool, get_domain_kind, get_if_delete_after_stop, \
     get_dict_from_item_in_table, update_domain_dict_create_dict, update_origin_and_parents_to_new_template, \
-    get_custom_dict_from_domain, update_domain_force_hyp, get_domain_force_update, update_domain_force_update
+    get_custom_dict_from_domain, update_domain_force_hyp, get_domain_force_update, update_domain_force_update, \
+    get_domain_hardware_dict, get_domains_from_user_started_with_personal_network
 from engine.services.lib.functions import exec_remote_list_of_cmds
 from engine.services.lib.qcow import create_cmd_disk_from_virtbuilder, get_host_long_operations_from_path
 from engine.services.lib.qcow import create_cmds_disk_from_base, create_cmds_delete_disk, get_path_to_disk, \
@@ -77,6 +78,48 @@ class UiActions(object):
             hyp = self.start_domain_from_xml(xml, id_domain, pool_id=pool_id)
             return hyp
 
+    def get_personal_networks(self, id_domain, next_hyp):
+        hw_dict = get_domain_hardware_dict(id_domain)
+        nets_to_define_libvirt = []
+        if 'interfaces' in hw_dict.keys():
+            interfaces = hw_dict['interfaces']
+            # if interfaces with type 'user'
+            user_networks = [d['net'] for d in interfaces if d['type'] == 'user']
+            nets_running = []
+            if len(user_networks) > 0:
+                # extract name from id_domain
+                id_user = id_domain[1:][:id_domain[1:].rfind('-')]
+                # find other desktops running for the same user
+                domains_started_user = get_domains_from_user_started_with_personal_network(id_user)
+                for d_domain in domains_started_user:
+                    for d_net in d_domain['hardware']['interfaces']:
+                        if d_net['type'] == 'user':
+                            net_name = d_net['net']
+                            if net_name in user_networks:
+                                nets_running.append(net_name)
+                                # change next_hyp to the same of personal networks
+                                next_hyp = d_domain['hyp_started']
+
+                ## if nets_running are not defined
+                nets_to_define = set(user_networks) - set(nets_running)
+                nets_to_define_libvirt = [id_user + '-' + name for name in nets_to_define]
+
+        return nets_to_define_libvirt, next_hyp
+
+    def get_force_hyp(self, id_domain, pool_id, next_hyp):
+        force_hyp = get_domain_force_hyp(id_domain)
+        if force_hyp is not False:
+            hyps_in_pool = get_hypers_in_pool(pool_id, only_online=False)
+            if force_hyp in hyps_in_pool:
+                next_hyp = force_hyp
+            else:
+                log.error('force hypervisor failed for doomain {}: {}  not in hypervisors pool {}'.format(id_domain,
+                                                                                                          force_hyp,
+                                                                                                          pool_id))
+                next_hyp = self.manager.pools[pool_id].get_next(domain_id=id_domain)
+
+        return next_hyp
+
     def start_paused_domain_from_xml(self, xml, id_domain, pool_id):
     #def start_paused_domain_from_xml(self, xml, id_domain, pool_id, start_after_created=False):
 
@@ -84,9 +127,19 @@ class UiActions(object):
         if pool_id in self.manager.pools.keys():
             next_hyp = self.manager.pools[pool_id].get_next(domain_id=id_domain)
             log.debug('//////////////////////')
+
+            # if force hyp change next_hyp to force_hyp
+            next_hyp = self.get_force_hyp(id_domain,pool_id,next_hyp)
+
+            ## if domain have personal network we want to run all domains in the same personal network in the same hypervisor
+            nets_to_define_libvirt, next_hyp = self.get_personal_networks(id_domain,next_hyp)
+
             if next_hyp is not False:
                 log.debug('next_hyp={}'.format(next_hyp))
-                dict_action = {'type': 'start_paused_domain', 'xml': xml, 'id_domain': id_domain}
+                dict_action = {'type': 'start_paused_domain',
+                               'xml': xml,
+                               'id_domain': id_domain,
+                               'create_nets': nets_to_define_libvirt}
                 # if start_after_created is True:
                 #     dict_action['start_after_created'] = True
                 #else:
@@ -124,21 +177,17 @@ class UiActions(object):
         else:
             return next_hyp
 
+
     def start_domain_from_xml(self, xml, id_domain, pool_id='default'):
         failed = False
         if pool_id in self.manager.pools.keys():
-            force_hyp = get_domain_force_hyp(id_domain)
-            if force_hyp is not False:
-                hyps_in_pool = get_hypers_in_pool(pool_id, only_online=False)
-                if force_hyp in hyps_in_pool:
-                    next_hyp = force_hyp
-                else:
-                    log.error('force hypervisor failed for doomain {}: {}  not in hypervisors pool {}'.format(id_domain,
-                                                                                                              force_hyp,
-                                                                                                              pool_id))
-                    next_hyp = self.manager.pools[pool_id].get_next(domain_id=id_domain)
-            else:
-                next_hyp = self.manager.pools[pool_id].get_next(domain_id=id_domain)
+            next_hyp = self.manager.pools[pool_id].get_next(domain_id=id_domain)
+
+            # if force hyp change next_hyp to force_hyp
+            next_hyp = self.get_force_hyp(id_domain,pool_id,next_hyp)
+
+            ## if domain have personal network we want to run all domains in the same personal network in the same hypervisor
+            nets_to_define_libvirt, next_hyp = self.get_personal_networks(id_domain,next_hyp)
 
             if next_hyp is not False:
                 # update_domain_status(status='Starting',
@@ -153,7 +202,10 @@ class UiActions(object):
                     update_table_field('domains',id_domain,'xml_to_start',xml)
                     print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
 
-                self.manager.q.workers[next_hyp].put({'type': 'start_domain', 'xml': xml, 'id_domain': id_domain})
+                self.manager.q.workers[next_hyp].put({'type': 'start_domain',
+                                                      'xml': xml,
+                                                      'id_domain': id_domain,
+                                                      'create_nets': nets_to_define_libvirt})
             else:
                 log.error('get next hypervisor in pool {} failed'.format(pool_id))
                 failed = True
