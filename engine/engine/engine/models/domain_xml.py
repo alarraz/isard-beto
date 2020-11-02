@@ -331,7 +331,7 @@ class DomainXML(object):
                     #list_dict['id'] = tree.xpath('source')[0].get('network')
                     list_dict['net'] = tree.xpath('source')[0].get('network')
 
-                if list_dict['type'] == 'bridge' and tree.xpath('source'):
+                if list_dict.get('type','') == 'bridge' and tree.xpath('source'):
                     #list_dict['id'] = tree.xpath('source')[0].get('bridge')
                     list_dict['net'] = tree.xpath('source')[0].get('bridge')
 
@@ -535,6 +535,8 @@ class DomainXML(object):
         xpath_next = '/domain/devices/input'
         xpath_previous = '/domain/devices/controller'
 
+        print(type_interface)
+        print(net)
         self.add_device(xpath_same, new_interface, xpath_next=xpath_next, xpath_previous=xpath_previous)
 
 
@@ -1059,6 +1061,10 @@ def update_xml_from_dict_domain(id_domain, xml=None):
     #VERIFING HARDWARE FROM XML
     hw_updated = v.dict_from_xml()
 
+    #mantain_user_networks
+    pprint(hw)
+    pprint(hw_updated)
+
     #pprint diffs between hardware and hardware from xml
     try:
         flatten_hw = flatten(hw, enumerate_types=(list,))
@@ -1067,7 +1073,9 @@ def update_xml_from_dict_domain(id_domain, xml=None):
         set_flatten_hw_updated = set((k, v) for k, v in flatten_hw_updated.items())
         diff_hw_TO_hw_updated = list(set_flatten_hw - set_flatten_hw_updated)
         diff_hw_updated_TO_hw = list(set_flatten_hw_updated - set_flatten_hw)
+        print('------ diff_hw_TO_hw_updated ------')
         pprint(sorted(diff_hw_TO_hw_updated))
+        print('------ diff_hw_updated_TO_hw ------')
         pprint(sorted(diff_hw_updated_TO_hw))
     except:
         pass
@@ -1306,9 +1314,14 @@ def recreate_xml_to_start(id, ssl=True, cpu_host_model=False):
         else:
             mac_selected = list_interfaces_mac[interface_index]
 
+        netname = d_interface['net']
+        if d_interface['kind'] == 'user':
+            id_user = id[1:][:id[1:].rfind('-')]
+            netname = id_user + '-' + netname
+
         x.add_interface(type_interface=d_interface['kind'],
                         model_type=d_interface['model'],
-                        net=d_interface['net'],
+                        net=netname,
                         qos=dict_bandwidth,
                         mac=mac_selected)
 

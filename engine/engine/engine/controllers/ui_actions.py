@@ -12,6 +12,7 @@ import traceback
 from os.path import dirname as extract_dir_path
 # from qcow import create_disk_from_base, backing_chain, create_cmds_disk_from_base
 from time import sleep
+from pprint import pprint
 
 from engine.models.domain_xml import DomainXML, update_xml_from_dict_domain, populate_dict_hardware_from_create_dict
 from engine.models.domain_xml import recreate_xml_to_start, BUS_TYPES
@@ -22,7 +23,7 @@ from engine.services.db import update_domain_viewer_started_values, update_table
     update_domain_status, get_domain_force_hyp, get_hypers_in_pool, get_domain_kind, get_if_delete_after_stop, \
     get_dict_from_item_in_table, update_domain_dict_create_dict, update_origin_and_parents_to_new_template, \
     get_custom_dict_from_domain, update_domain_force_hyp, get_domain_force_update, update_domain_force_update, \
-    get_domain_hardware_dict, get_domains_from_user_started_with_personal_network
+    get_domain_hardware_dict, get_domains_from_user_started_with_personal_network, get_domain_create_dict
 from engine.services.lib.functions import exec_remote_list_of_cmds
 from engine.services.lib.qcow import create_cmd_disk_from_virtbuilder, get_host_long_operations_from_path
 from engine.services.lib.qcow import create_cmds_disk_from_base, create_cmds_delete_disk, get_path_to_disk, \
@@ -79,30 +80,38 @@ class UiActions(object):
             return hyp
 
     def get_personal_networks(self, id_domain, next_hyp):
-        hw_dict = get_domain_hardware_dict(id_domain)
+        create_dict = get_domain_create_dict(id_domain)['hardware']
         nets_to_define_libvirt = []
-        if 'interfaces' in hw_dict.keys():
-            interfaces = hw_dict['interfaces']
+        if 'interfaces' in create_dict.keys():
+            interfaces = create_dict['interfaces']
             # if interfaces with type 'user'
-            user_networks = [d['net'] for d in interfaces if d['type'] == 'user']
+            try:
+                user_networks = [net for net in interfaces if get_interface(net)['kind'] == 'user']
+            except:
+                log.error('error when get_interface for user_networks from database??')
+                user_networks = []
+            print('USER NETWORKS')
+            pprint(user_networks)
             nets_running = []
             if len(user_networks) > 0:
                 # extract name from id_domain
                 id_user = id_domain[1:][:id_domain[1:].rfind('-')]
                 # find other desktops running for the same user
                 domains_started_user = get_domains_from_user_started_with_personal_network(id_user)
+                pprint('DOMAINS STARTED USER')
+                pprint(domains_started_user)
                 for d_domain in domains_started_user:
-                    for d_net in d_domain['hardware']['interfaces']:
-                        if d_net['type'] == 'user':
-                            net_name = d_net['net']
-                            if net_name in user_networks:
-                                nets_running.append(net_name)
-                                # change next_hyp to the same of personal networks
-                                next_hyp = d_domain['hyp_started']
+                    for net_name in d_domain['create_dict']['hardware']['interfaces']:
+                        if net_name in user_networks:
+                            nets_running.append(net_name)
+                            # change next_hyp to the same of personal networks
+                            next_hyp = d_domain['hyp_started']
 
                 ## if nets_running are not defined
                 nets_to_define = set(user_networks) - set(nets_running)
                 nets_to_define_libvirt = [id_user + '-' + name for name in nets_to_define]
+                pprint(nets_to_define)
+                pprint(nets_to_define_libvirt)
 
         return nets_to_define_libvirt, next_hyp
 

@@ -550,8 +550,8 @@ def get_domains_from_user_started_with_personal_network(user):
     r_conn = new_rethink_connection()
     rtable = r.table('domains')
     l = list(rtable.filter({'status':'Started','user': user, 'kind': 'desktop'}).pluck('status', 'id', 'kind','hyp_started',
-                                                           {'hardware': [{'interfaces': ['type','net']}]}).run(r_conn))
-    close_rethink_connection()
+                                                           {'create_dict': [{'hardware': [{'interfaces'}]}]}).run(r_conn))
+    close_rethink_connection(r_conn)
     return l
 
 

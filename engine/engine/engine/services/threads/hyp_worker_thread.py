@@ -122,7 +122,7 @@ class HypWorkerThread(threading.Thread):
                         from pprint import pformat
                         error_msg = pformat(e.get_error_message())
 
-                        update_domain_status('Failed ', action['id_domain'], hyp_id=self.hyp_id,
+                        update_domain_status('Failed', action['id_domain'], hyp_id=self.hyp_id,
                                              detail='domain {} failed when try to start in pause mode in hypervisor {}. creating domain operation is aborted')
                         logs.workers.error(
                             'Exception in libvirt starting paused xml for domain {} in hypervisor {}. Exception message: {} '.format(
